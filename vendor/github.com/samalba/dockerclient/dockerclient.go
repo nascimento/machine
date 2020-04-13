@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	APIVersion = "v1.15"
+	APIVersion = "v1.40"
 )
 
 var (
