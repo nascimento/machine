@@ -208,12 +208,12 @@ func (provisioner *WindowsContainerProvisioner) Provision(swarmOptions swarm.Opt
 	\"tlsverify\": true,
 	\"tls\": true,
 	\"experimental\": true,
-	\"tlscacert\": \"{{.AuthOptions.CaCertRemotePath}}\",
-	\"tlscert\": \"{{.AuthOptions.ServerCertRemotePath}}\",
-	\"tlskey\": \"{{.AuthOptions.ServerKeyRemotePath}}\",
-	\"labels\": [{{ range .EngineOptions.Labels }}\"{{.}}\"{{ end }}],
-	\"insecure-registries\": [{{ range .EngineOptions.InsecureRegistry }}\"{{.}}\"{{ end }}],
-	\"registry-mirrors\": [{{ range .EngineOptions.RegistryMirror }}\"{{.}}\"{{ end }}]
+	\"tlscacert\": \"{{.CaCertRemotePath}}\",
+	\"tlscert\": \"{{.ServerCertRemotePath}}\",
+	\"tlskey\": \"{{.ServerKeyRemotePath}}\",
+	\"labels\": [{{ .Labels }}],
+	\"insecure-registries\": [{{ .Registries }}],
+	\"registry-mirrors\": [{{ .Mirrors }}]
 }
 `
 	t, err := template.New("engineConfig").Parse(engineConfigTmpl)
@@ -221,10 +221,39 @@ func (provisioner *WindowsContainerProvisioner) Provision(swarmOptions swarm.Opt
 		return err
 	}
 
-	engineConfigContext := EngineConfigContext{
-		DockerPort:    dockerPort,
-		AuthOptions:   provisioner.AuthOptions,
-		EngineOptions: provisioner.EngineOptions,
+	labels := []string{}
+	for i := range provisioner.EngineOptions.Labels {
+		labels = append(labels, "\\\""+provisioner.EngineOptions.Labels[i]+"\\\"")
+	}
+
+	registries := []string{}
+	for i := range provisioner.EngineOptions.InsecureRegistry {
+		registries = append(registries, "\\\""+provisioner.EngineOptions.InsecureRegistry[i]+"\\\"")
+	}
+
+	mirrors := []string{}
+	for i := range provisioner.EngineOptions.RegistryMirror {
+		mirrors = append(mirrors, "\\\""+provisioner.EngineOptions.RegistryMirror[i]+"\\\"")
+	}
+
+	type Inventory struct {
+		DockerPort           int
+		CaCertRemotePath     string
+		ServerCertRemotePath string
+		ServerKeyRemotePath  string
+		Labels               string
+		Registries           string
+		Mirrors              string
+	}
+
+	engineConfigContext := Inventory{
+		DockerPort:           dockerPort,
+		CaCertRemotePath:     provisioner.AuthOptions.CaCertRemotePath,
+		ServerCertRemotePath: provisioner.AuthOptions.ServerCertRemotePath,
+		ServerKeyRemotePath:  provisioner.AuthOptions.ServerKeyRemotePath,
+		Labels:               strings.Join(labels[:], ","),
+		Registries:           strings.Join(registries[:], ","),
+		Mirrors:              strings.Join(mirrors[:], ","),
 	}
 
 	t.Execute(&engineCfg, engineConfigContext)
